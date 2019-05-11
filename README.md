@@ -83,9 +83,12 @@ matchengine
 
 ## API
 
-[HTTP Protocol](https://github.com/viabtc/viabtc_exchange_server/wiki/HTTP-Protocol) and [Websocket Protocol](https://github.com/viabtc/viabtc_exchange_server/wiki/WebSocket-Protocol) documents are available in Chinese. Should time permit, we will have it translated into English in the future.</br>
-[Python3 API realisation](https://github.com/grumpydevelop/viabtc_exchange_server_tools/blob/master/api/api_exchange.py)
+[HTTP Protocol](https://github.com/viabtc/viabtc_exchange_server/wiki/HTTP-Protocol) and [Websocket Protocol](https://github.com/viabtc/viabtc_exchange_server/wiki/WebSocket-Protocol) documents are available in Chinese. Should time permit, we will have it translated into English in the future.
 
+### Third-party Clients
+
+- [Python3 API realisation](https://github.com/testnet-exchange/python-viabtc-api)
+- [Ruby Gem 💎](https://github.com/krmbzds/viabtc)
 
 ## Websocket authorization
 
@@ -96,7 +99,3 @@ To accomodate this method your exchange frontend will need to supply an internal
 The internal authorization endpoint is defined by the `auth_url` setting in the config file (`accessws/config.json`).
 
 Example response: `{"code": 0, "message": null, "data": {"user_id": 1}}`
-
-## Produced my morejust foundation
-
-[<img src="https://raw.githubusercontent.com/morejust/foundation/master/madebymorejust.png" width="100">](https://morejust.foundation/?from=viabtc_exchange_server)
