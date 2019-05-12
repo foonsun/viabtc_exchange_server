@@ -1,5 +1,5 @@
 #!/bin/bash
 
-killall -s SIGQUIT accesshttp
+killall -s SIGQUIT accesshttp.exe
 sleep 1
-./accesshttp config.json
+./accesshttp.exe config.json

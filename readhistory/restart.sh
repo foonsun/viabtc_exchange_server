@@ -1,5 +1,5 @@
 #!/bin/bash
 
-killall -s SIGQUIT readhistory
+killall -s SIGQUIT readhistory.exe
 sleep 1
-./readhistory config.json
+./readhistory.exe config.json

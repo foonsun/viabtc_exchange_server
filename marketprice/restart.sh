@@ -1,5 +1,5 @@
 #!/bin/bash
 
-killall -s SIGQUIT marketprice
+killall -s SIGQUIT marketprice.exe
 sleep 1
-./marketprice config.json
+./marketprice.exe config.json
