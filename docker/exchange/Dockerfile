@@ -110,27 +110,27 @@ RUN rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /viabtc_exchange_server
 # keep .exe for better grep of ps output
-COPY --from=BUILDSTEP   /viabtc_exchange_server/alertcenter/alertcenter \
+COPY --from=BUILDSTEP   /viabtc_exchange_server/alertcenter/alertcenter.exe \
                         /viabtc_exchange_server/alertcenter.exe
 COPY docker/exchange/configs/alertcenter.json /viabtc_exchange_server
 
-COPY --from=BUILDSTEP   /viabtc_exchange_server/matchengine/matchengine \
+COPY --from=BUILDSTEP   /viabtc_exchange_server/matchengine/matchengine.exe \
                         /viabtc_exchange_server/matchengine.exe
 COPY docker/exchange/configs/matchengine.json /viabtc_exchange_server
 
-COPY --from=BUILDSTEP   /viabtc_exchange_server/marketprice/marketprice \
+COPY --from=BUILDSTEP   /viabtc_exchange_server/marketprice/marketprice.exe \
                         /viabtc_exchange_server/marketprice.exe
 COPY docker/exchange/configs/marketprice.json /viabtc_exchange_server
 
-COPY --from=BUILDSTEP   /viabtc_exchange_server/readhistory/readhistory \
+COPY --from=BUILDSTEP   /viabtc_exchange_server/readhistory/readhistory.exe \
                         /viabtc_exchange_server/readhistory.exe
 COPY docker/exchange/configs/readhistory.json /viabtc_exchange_server
 
-COPY --from=BUILDSTEP   /viabtc_exchange_server/accesshttp/accesshttp \
+COPY --from=BUILDSTEP   /viabtc_exchange_server/accesshttp/accesshttp.exe \
                         /viabtc_exchange_server/accesshttp.exe
 COPY docker/exchange/configs/accesshttp.json /viabtc_exchange_server
 
-COPY --from=BUILDSTEP   /viabtc_exchange_server/accessws/accessws \
+COPY --from=BUILDSTEP   /viabtc_exchange_server/accessws/accessws.exe \
                         /viabtc_exchange_server/accessws.exe
 COPY docker/exchange/configs/accessws.json /viabtc_exchange_server
 

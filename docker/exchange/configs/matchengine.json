@@ -37,27 +37,31 @@
   },
   "assets": [
       {
-          "name": "RINKEBY",
-          "prec_save": 16,
+          "name": "USDT",
+          "prec_save": 20,
           "prec_show": 8
       },{
-          "name": "TESTNET3",
-          "prec_save": 16,
+          "name": "ETH",
+          "prec_save": 20,
           "prec_show": 8
-      }
+      }, {
+			"name": "BTC",
+			"prec_save": 12,
+			"prec_show": 8
+	  }
   ],
   "markets": [
       {
-          "name": "TESTNET3RINKEBY",
+          "name": "BTCUSDT",
           "stock": {
-              "name": "RINKEBY",
+              "name": "BTC",
               "prec": 8
           },
           "money": {
-              "name": "TESTNET3",
+              "name": "USDT",
               "prec": 8
           },
-          "min_amount":"0.00001"
+          "min_amount":"0.001"
       }
   ],
   "brokers": "kafka:9092",
