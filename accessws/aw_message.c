@@ -25,16 +25,17 @@ static int process_orders_message(json_t *msg)
     if (user_id == 0 || stock == NULL || money == NULL)
         return -__LINE__;
 
-    asset_on_update(user_id, stock);
-    asset_on_update(user_id, money);
-    order_on_update(user_id, event, order);
+    //asset_on_update(user_id, stock);
+    //asset_on_update(user_id, money);
+    //order_on_update(user_id, event, order, false);
+    order_on_update(GATEWAY_USER_ID, event, order, true); // XXX Notify middleware
 
     return 0;
 }
 
 static void on_orders_message(sds message, int64_t offset)
 {
-    log_trace("order message: %s", message);
+    log_trace("order message: %s @ %" PRId64, message, offset);
     json_t *msg = json_loads(message, 0, NULL);
     if (!msg) {
         log_error("invalid balance message: %s", message);

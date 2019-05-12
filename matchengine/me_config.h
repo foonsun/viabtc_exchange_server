@@ -1,5 +1,5 @@
 /*
- * Description: 
+ * Description:
  *     History: yang@haipo.me, 2017/03/16, create
  */
 
@@ -21,6 +21,7 @@
 # include "nw_clt.h"
 # include "nw_job.h"
 # include "nw_timer.h"
+# include "nw_periodic.h"
 
 # include "ut_log.h"
 # include "ut_sds.h"
@@ -48,13 +49,16 @@
 # define MAX_PENDING_HISTORY    1000
 # define MAX_PENDING_MESSAGE    1000
 
-struct asset {
+typedef struct asset {
+    uint32_t            id;
     char                *name;
     int                 prec_save;
     int                 prec_show;
-};
+    mpd_t               *min_amount;
+} asset_info_t;
 
-struct market {
+typedef struct market {
+    uint32_t            id;
     char                *name;
     char                *stock;
     char                *money;
@@ -62,7 +66,9 @@ struct market {
     int                 stock_prec;
     int                 money_prec;
     mpd_t               *min_amount;
-};
+    mpd_t               *init_price;
+    mpd_t               *closing_price;
+} market_info_t;
 
 struct settings {
     bool                debug;
@@ -73,6 +79,7 @@ struct settings {
     cli_svr_cfg         cli;
     mysql_cfg           db_log;
     mysql_cfg           db_history;
+    mysql_cfg           db_sys;
 
     size_t              asset_num;
     struct asset        *assets;
@@ -80,16 +87,17 @@ struct settings {
     size_t              market_num;
     struct market       *markets;
 
-    char                *brokers;
     int                 slice_interval;
     int                 slice_keeptime;
     int                 history_thread;
     double              cache_timeout;
+
+    kafka_producer_cfg  producer;
 };
 
 extern struct settings settings;
 
 int init_config(const char *path);
+int init_job();
 
 # endif
-

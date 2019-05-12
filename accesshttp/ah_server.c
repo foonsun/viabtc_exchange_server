@@ -29,7 +29,7 @@ struct request_info {
 static void reply_error(nw_ses *ses, int64_t id, int code, const char *message, uint32_t status)
 {
     json_t *error = json_object();
-    json_object_set_new(error, "code", json_integer(code));
+    json_object_set_new(error, "code", json_integer(code+5000));
     json_object_set_new(error, "message", json_string(message));
     json_t *reply = json_object();
     json_object_set_new(reply, "error", error);
@@ -267,6 +267,8 @@ static int init_methods_handler(void)
 
     ERR_RET_LN(add_handler("order.put_limit", matchengine, CMD_ORDER_PUT_LIMIT));
     ERR_RET_LN(add_handler("order.put_market", matchengine, CMD_ORDER_PUT_MARKET));
+    ERR_RET_LN(add_handler("order.put_aon", matchengine, CMD_ORDER_PUT_AON));
+    ERR_RET_LN(add_handler("order.put_fok", matchengine, CMD_ORDER_PUT_FOK));
     ERR_RET_LN(add_handler("order.cancel", matchengine, CMD_ORDER_CANCEL));
     ERR_RET_LN(add_handler("order.book", matchengine, CMD_ORDER_BOOK));
     ERR_RET_LN(add_handler("order.depth", matchengine, CMD_ORDER_BOOK_DEPTH));
@@ -284,6 +286,9 @@ static int init_methods_handler(void)
     ERR_RET_LN(add_handler("market.user_deals", readhistory, CMD_MARKET_USER_DEALS));
     ERR_RET_LN(add_handler("market.list", matchengine, CMD_MARKET_LIST));
     ERR_RET_LN(add_handler("market.summary", matchengine, CMD_MARKET_SUMMARY));
+
+    ERR_RET_LN(add_handler("market.register", matchengine, CMD_MARKET_REGISTER));
+    ERR_RET_LN(add_handler("market.detail", matchengine, CMD_MARKET_DETAIL));
 
     return 0;
 }

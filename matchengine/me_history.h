@@ -19,4 +19,3 @@ bool is_history_block(void);
 sds history_status(sds reply);
 
 # endif
-

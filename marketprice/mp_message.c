@@ -43,6 +43,7 @@ static int64_t  last_offset;
 static nw_timer market_timer;
 static nw_timer clear_timer;
 static nw_timer redis_timer;
+static nw_periodic config_periodic;
 
 static uint32_t dict_sds_key_hash_func(const void *key)
 {
@@ -275,6 +276,7 @@ static struct market_info *create_market(const char *market)
 
     sds key = sdsnew(market);
     dict_add(dict_market, key, info);
+    log_debug("new market created - %s", info->name);
 
     return info;
 }
@@ -347,37 +349,50 @@ static int init_market(void)
     type.hash_function = dict_sds_key_hash_func;
     type.key_compare = dict_sds_key_compare;
     type.key_destructor = dict_sds_key_free;
+
     dict_market = dict_create(&type, 64);
     if (dict_market == NULL)
         return -__LINE__;
 
-    redisContext *context = redis_sentinel_connect_master(redis);
-    if (context == NULL)
-        return -__LINE__;
-    json_t *r = send_market_list_req();
+    json_t *r = send_market_list_req(); // market list from MatchEngine
     if (r == NULL) {
         log_error("get market list fail");
-        redisFree(context);
         return -__LINE__;
     }
+
+    redisContext *context = redis_sentinel_connect_master(redis);
+    if (context == NULL) {
+        log_error("redis connection failed");
+        return -__LINE__;
+    }
+
     for (size_t i = 0; i < json_array_size(r); ++i) {
         json_t *item = json_array_get(r, i);
         const char *name = json_string_value(json_object_get(item, "name"));
-        log_stderr("init market %s", name);
+        uint32_t money_prec = json_integer_value(json_object_get(item, "money_prec"));
+        mpd_t *last_price = decimal(json_string_value(json_object_get(item, "last_price")), money_prec);
+
         struct market_info *info = create_market(name);
         if (info == NULL) {
             log_error("create market %s fail", name);
+            mpd_del(last_price);
             json_decref(r);
             redisFree(context);
             return -__LINE__;
         }
+
         int ret = load_market(context, info);
         if (ret < 0) {
             log_error("load market %s fail: %d", name, ret);
+            mpd_del(last_price);
             json_decref(r);
             redisFree(context);
             return -__LINE__;
         }
+
+        if (mpd_cmp(info->last, mpd_zero, &mpd_ctx) == 0)
+            info->last = mpd_qncopy(last_price);
+        mpd_del(last_price);
     }
     json_decref(r);
     redisFree(context);
@@ -494,6 +509,11 @@ static int market_update(const char *market, double timestamp, mpd_t *price, mpd
 
     // update last
     mpd_copy(info->last, price, &mpd_ctx);
+
+    if (mpd_cmp(amount, mpd_zero, &mpd_ctx) == 0) {
+        info->update_time = current_timestamp();
+        return 0;
+    }
 
     // append deals
     json_t *deal = json_object();
@@ -785,6 +805,48 @@ static void clear_kline(void)
     dict_release_iterator(iter);
 }
 
+static int load_new_markets()
+{
+    json_t *r = send_market_list_req(); // market list from MatchEngine
+    if (r == NULL) {
+        log_fatal("market list from MatchEngine failed");
+        return -__LINE__;
+    }
+
+    time_t now = time(NULL);
+    for (size_t i = 0; i < json_array_size(r); ++i) {
+        json_t *item = json_array_get(r, i);
+        const char *name = json_string_value(json_object_get(item, "name"));
+        uint32_t money_prec = json_integer_value(json_object_get(item, "money_prec"));
+        const char *init_price = json_string_value(json_object_get(item, "init_price"));
+
+        if (market_exist(name))
+            continue;
+
+        struct market_info *info = create_market(name);
+        if (info == NULL) {
+            log_fatal("create_market %s failed", name);
+            json_decref(r);
+            return -__LINE__;
+        }
+
+        mpd_t *price = decimal(init_price, money_prec);
+        int ret = market_update(name, now, price, mpd_zero, 0, 0);
+        mpd_del(price);
+        if (ret < 0)
+            log_error("market_update fail %d, message: %s", ret, name);
+    }
+    json_decref(r);
+
+    return 0;
+}
+
+
+static void on_config_periodic(nw_periodic *periodic, void *privdata)
+{
+    load_new_markets();
+}
+
 static void on_market_timer(nw_timer *timer, void *privdata)
 {
     int ret = flush_market();
@@ -896,6 +958,10 @@ int init_message(void)
     nw_timer_set(&market_timer, 10, true, on_market_timer, NULL);
     nw_timer_start(&market_timer);
 
+    // Load new market from ME
+    nw_periodic_set(&config_periodic, 1545067800, 3600, on_config_periodic, NULL);
+    nw_periodic_start(&config_periodic);
+
     nw_timer_set(&clear_timer, 3600, true, on_clear_timer, NULL);
     nw_timer_start(&clear_timer);
 
@@ -925,7 +991,7 @@ static struct kline_info *get_last_kline(dict_t *dict, time_t start, time_t end,
     return NULL;
 }
 
-json_t *get_market_status(const char *market, int period)
+json_t *get_market_status(const char *market, int period, time_t start)
 {
     struct market_info *info = market_query(market);
     if (info == NULL)
@@ -933,7 +999,10 @@ json_t *get_market_status(const char *market, int period)
 
     struct kline_info *kinfo = NULL;
     time_t now = time(NULL);
-    time_t start = now - period;
+    if (start == 0)
+        start = now - period;
+    else if (start < now - settings.sec_max)
+        start = now - settings.sec_max;
     time_t start_min = start / 60 * 60 + 60;
 
     for (time_t timestamp = start; timestamp < start_min; timestamp++) {
@@ -963,13 +1032,13 @@ json_t *get_market_status(const char *market, int period)
 
     json_t *result = json_object();
     json_object_set_new(result, "period", json_integer(period));
-    json_object_set_new_mpd(result, "last", info->last);
     json_object_set_new_mpd(result, "open", kinfo->open);
     json_object_set_new_mpd(result, "close", kinfo->close);
     json_object_set_new_mpd(result, "high", kinfo->high);
     json_object_set_new_mpd(result, "low", kinfo->low);
     json_object_set_new_mpd(result, "volume", kinfo->volume);
     json_object_set_new_mpd(result, "deal", kinfo->deal);
+    json_object_set_new_mpd(result, "last", info->last);
 
     kline_info_free(kinfo);
 
@@ -1326,6 +1395,7 @@ json_t *get_market_kline_month(const char *market, time_t start, time_t end, int
         }
         if (kinfo == NULL) {
             if (klast == NULL) {
+                mon_start = mon_next;
                 continue;
             }
             kinfo = kline_info_new(klast->close);
@@ -1369,12 +1439,31 @@ json_t *get_market_deals(const char *market, int limit, uint64_t last_id)
     return result;
 }
 
-mpd_t  *get_market_last_price(const char *market)
+mpd_t *get_market_last_price(const char *market)
 {
     struct market_info *info = market_query(market);
     if (info == NULL)
         return NULL;
 
     return info->last;
+}
+
+json_t *get_market_last_prices(json_t *result)
+{
+    dict_iterator *iter = dict_get_iterator(dict_market);
+    dict_entry *entry;
+    while ((entry = dict_next(iter)) != NULL) {
+        struct market_info *info = entry->val;
+        char *last_str = mpd_to_sci(info->last, 0);
+
+        json_t *row = json_object();
+        json_object_set_new(row, "name", json_string(info->name));
+        json_object_set_new(row, "last", json_string(last_str));
+        json_array_append_new(result, row);
+        free(last_str);
+    }
+    dict_release_iterator(iter);
+
+    return result;
 }
 

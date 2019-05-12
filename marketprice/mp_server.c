@@ -42,7 +42,7 @@ static int reply_json(nw_ses *ses, rpc_pkg *pkg, const json_t *json)
 static int reply_error(nw_ses *ses, rpc_pkg *pkg, int code, const char *message)
 {
     json_t *error = json_object();
-    json_object_set_new(error, "code", json_integer(code));
+    json_object_set_new(error, "code", json_integer(code+5000));
     json_object_set_new(error, "message", json_string(message));
 
     json_t *reply = json_object();
@@ -116,7 +116,7 @@ static int add_cache(sds cache_key, json_t *result)
 
 static int on_cmd_market_status(nw_ses *ses, rpc_pkg *pkg, json_t *params)
 {
-    if (json_array_size(params) != 2)
+    if (json_array_size(params) != 3)
         return reply_error_invalid_argument(ses, pkg);
 
     const char *market = json_string_value(json_array_get(params, 0));
@@ -129,11 +129,15 @@ static int on_cmd_market_status(nw_ses *ses, rpc_pkg *pkg, json_t *params)
     if (period <= 0 || period > settings.sec_max)
         return reply_error_invalid_argument(ses, pkg);
 
+    time_t start = json_integer_value(json_array_get(params, 2));
+    if (start < 0)
+        return reply_error_invalid_argument(ses, pkg);
+
     sds cache_key = NULL;
     if (process_cache(ses, pkg, &cache_key))
         return 0;
 
-    json_t *result = get_market_status(market, period);
+    json_t *result = get_market_status(market, period, start);
     if (result == NULL) {
         sdsfree(cache_key);
         return reply_error_internal_error(ses, pkg);
@@ -254,22 +258,30 @@ static int on_cmd_market_deals(nw_ses *ses, rpc_pkg *pkg, json_t *params)
 
 static int on_cmd_market_last(nw_ses *ses, rpc_pkg *pkg, json_t *params)
 {
-    if (json_array_size(params) != 1)
-        return reply_error_invalid_argument(ses, pkg);
+    json_t *result = json_array();
+    if (json_array_size(params) == 1) {
+        const char *market = json_string_value(json_array_get(params, 0));
+        if (!market)
+            return reply_error_invalid_argument(ses, pkg);
+        if (!market_exist(market))
+            return reply_error_invalid_argument(ses, pkg);
 
-    const char *market = json_string_value(json_array_get(params, 0));
-    if (!market)
-        return reply_error_invalid_argument(ses, pkg);
-    if (!market_exist(market))
-        return reply_error_invalid_argument(ses, pkg);
+        mpd_t *last = get_market_last_price(market);
+        if (last == NULL)
+            return reply_error_internal_error(ses, pkg);
 
-    mpd_t *last = get_market_last_price(market);
-    if (last == NULL)
-        return reply_error_internal_error(ses, pkg);
+        char *last_str = mpd_to_sci(last, 0);
 
-    char *last_str = mpd_to_sci(last, 0);
-    json_t *result = json_string(last_str);
-    free(last_str);
+        json_t *row = json_object();
+        json_object_set_new(row, "name", json_string(market));
+        json_object_set_new(row, "last", json_string(last_str));
+        json_array_append_new(result, row);
+
+        free(last_str);
+    }
+    else if (json_array_size(params) == 0) {
+        result = get_market_last_prices(result);
+    }
 
     int ret = reply_result(ses, pkg, result);
     json_decref(result);

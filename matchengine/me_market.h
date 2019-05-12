@@ -46,6 +46,11 @@ typedef struct market_t {
 
     skiplist_t      *asks;
     skiplist_t      *bids;
+
+    mpd_t           *last_price;
+    mpd_t           *closing_price;
+
+    bool            include_fee;
 } market_t;
 
 market_t *market_create(struct market *conf);
@@ -53,6 +58,8 @@ int market_get_status(market_t *m, size_t *ask_count, mpd_t *ask_amount, size_t 
 
 int market_put_limit_order(bool real, json_t **result, market_t *m, uint32_t user_id, uint32_t side, mpd_t *amount, mpd_t *price, mpd_t *taker_fee, mpd_t *maker_fee, const char *source);
 int market_put_market_order(bool real, json_t **result, market_t *m, uint32_t user_id, uint32_t side, mpd_t *amount, mpd_t *taker_fee, const char *source);
+int market_put_aon_order(bool real, json_t **result, market_t *m, uint32_t user_id, uint32_t side, mpd_t *amount, mpd_t *price, mpd_t *taker_fee, mpd_t *maker_fee, const char *source);
+int market_put_fok_order(bool real, json_t **result, market_t *m, uint32_t user_id, uint32_t side, mpd_t *amount, mpd_t *price, mpd_t *taker_fee, const char *source);
 int market_cancel_order(bool real, json_t **result, market_t *m, order_t *order);
 
 int market_put_order(market_t *m, order_t *order);
@@ -63,5 +70,9 @@ skiplist_t *market_get_order_list(market_t *m, uint32_t user_id);
 
 sds market_status(sds reply);
 
-# endif
+int market_register(const char *asset, char *init_price);
+json_t *market_detail(market_t *market);
+int add_user_to_market(const char *market, uint32_t user_id);
+bool check_price_limit(mpd_t *cmp_price, mpd_t *price, const char *pct);
 
+# endif

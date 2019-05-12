@@ -24,6 +24,8 @@
 # define CMD_ORDER_HISTORY          208
 # define CMD_ORDER_DEALS            209
 # define CMD_ORDER_DETAIL_FINISHED  210
+# define CMD_ORDER_PUT_AON          211
+# define CMD_ORDER_PUT_FOK          212
 
 // market
 # define CMD_MARKET_STATUS          301
@@ -34,6 +36,9 @@
 # define CMD_MARKET_USER_DEALS      306
 # define CMD_MARKET_LIST            307
 # define CMD_MARKET_SUMMARY         308
+
+# define CMD_MARKET_REGISTER        309
+# define CMD_MARKET_DETAIL          310
 
 # endif
 

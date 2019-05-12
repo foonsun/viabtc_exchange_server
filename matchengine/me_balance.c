@@ -10,8 +10,10 @@ dict_t *dict_balance;
 static dict_t *dict_asset;
 
 struct asset_type {
+    uint32_t id;
     int prec_save;
     int prec_show;
+    mpd_t *min_amount;
 };
 
 static uint32_t asset_dict_hash_function(const void *key)
@@ -118,13 +120,27 @@ int init_balance()
 
     for (size_t i = 0; i < settings.asset_num; ++i) {
         struct asset_type type;
+        type.id = settings.assets[i].id;
         type.prec_save = settings.assets[i].prec_save;
         type.prec_show = settings.assets[i].prec_show;
+        type.min_amount = settings.assets[i].min_amount;
+
         if (dict_add(dict_asset, settings.assets[i].name, &type) == NULL)
             return -__LINE__;
     }
 
     return 0;
+}
+
+void update_asset(asset_info_t *asset)
+{
+    struct asset_type type;
+    type.prec_save = asset->prec_save;
+    type.prec_show = asset->prec_show;
+    type.min_amount = asset->min_amount;
+    type.id = asset->id;
+
+    dict_add(dict_asset, asset->name, &type);
 }
 
 static struct asset_type *get_asset_type(const char *asset)
@@ -152,6 +168,18 @@ int asset_prec_show(const char *asset)
 {
     struct asset_type *at = get_asset_type(asset);
     return at ? at->prec_show: -1;
+}
+
+uint32_t asset_idx(const char *asset)
+{
+    struct asset_type *at = get_asset_type(asset);
+    return at->id;
+}
+
+mpd_t *asset_min_amount(const char *asset)
+{
+    struct asset_type *at = get_asset_type(asset);
+    return at->min_amount;
 }
 
 mpd_t *balance_get(uint32_t user_id, uint32_t type, const char *asset)
@@ -320,8 +348,7 @@ mpd_t *balance_unfreeze(uint32_t user_id, const char *asset, mpd_t *amount)
 
 mpd_t *balance_total(uint32_t user_id, const char *asset)
 {
-    mpd_t *balance = mpd_new(&mpd_ctx);
-    mpd_copy(balance, mpd_zero, &mpd_ctx);
+    mpd_t *balance = mpd_qncopy(mpd_zero);
     mpd_t *available = balance_get(user_id, BALANCE_TYPE_AVAILABLE, asset);
     if (available) {
         mpd_add(balance, balance, available, &mpd_ctx);
@@ -334,8 +361,9 @@ mpd_t *balance_total(uint32_t user_id, const char *asset)
     return balance;
 }
 
-int balance_status(const char *asset, mpd_t *total, size_t *available_count, mpd_t *available, size_t *freeze_count, mpd_t *freeze)
+int balance_status(const char *asset, mpd_t *total, size_t *available_count, mpd_t *available, size_t *freeze_count, mpd_t *freeze, size_t *total_count)
 {
+    *total_count = 0;
     *freeze_count = 0;
     *available_count = 0;
     mpd_copy(total, mpd_zero, &mpd_ctx);
@@ -356,9 +384,9 @@ int balance_status(const char *asset, mpd_t *total, size_t *available_count, mpd
             *freeze_count += 1;
             mpd_add(freeze, freeze, entry->val, &mpd_ctx);
         }
+        *total_count += 1;
     }
     dict_release_iterator(iter);
 
     return 0;
 }
-

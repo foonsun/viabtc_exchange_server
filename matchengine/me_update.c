@@ -8,6 +8,7 @@
 # include "me_balance.h"
 # include "me_history.h"
 # include "me_message.h"
+# include "me_market.h"
 
 static dict_t *dict_update;
 static nw_timer timer;
@@ -102,15 +103,26 @@ int update_user_balance(bool real, uint32_t user_id, const char *asset, const ch
 
     dict_entry *entry = dict_find(dict_update, &key);
     if (entry) {
-        return -1;
+        return -1; // repeated request
     }
 
-    mpd_t *result;
+    mpd_t *result = NULL;
     mpd_t *abs_change = mpd_new(&mpd_ctx);
     mpd_abs(abs_change, change, &mpd_ctx);
-    if (mpd_cmp(change, mpd_zero, &mpd_ctx) >= 0) {
+
+    // 1) FREEZE
+    if (strcmp(business, "freeze") == 0) {
+        if (mpd_cmp(change, mpd_zero, &mpd_ctx) >= 0)
+            return -__LINE__;
+
+        result = balance_freeze(user_id, asset, abs_change);
+    }
+    // 2) DEPOSIT
+    else if (mpd_cmp(change, mpd_zero, &mpd_ctx) >= 0) {
         result = balance_add(user_id, BALANCE_TYPE_AVAILABLE, asset, abs_change);
-    } else {
+    }
+    // 3) WITHDRAW
+    else {
         result = balance_sub(user_id, BALANCE_TYPE_AVAILABLE, asset, abs_change);
     }
     mpd_del(abs_change);
@@ -124,10 +136,14 @@ int update_user_balance(bool real, uint32_t user_id, const char *asset, const ch
         double now = current_timestamp();
         json_object_set_new(detail, "id", json_integer(business_id));
         char *detail_str = json_dumps(detail, 0);
+
         append_user_balance_history(now, user_id, asset, business, change, detail_str);
         free(detail_str);
         push_balance_message(now, user_id, asset, business, change);
     }
+
+    // Update dict_market->users
+    add_user_to_market(asset, user_id);
 
     return 0;
 }

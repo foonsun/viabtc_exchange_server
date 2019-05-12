@@ -10,6 +10,7 @@
 
 int init_trade(void);
 market_t *get_market(const char *name);
+int update_market(market_info_t *market);
 
 # endif
 
